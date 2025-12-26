@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  gip-semantic-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gip-semantic-bridge
+    ports:
+      - "8811:8811"
+    environment:
+      FEDERATION_HOST: gip-federation
+      FEDERATION_PORT: 8810
+      BRIDGE_PORT: 8811
+      OLLAMA_URL: http://ollama:11434
+      SEMANTIC_MODEL: mistral
+      NODE_ENV: production
+    depends_on:
+      - gip-federation
+      - ollama
+    restart: unless-stopped
+    networks:
+      - gip-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8811/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - ./logs:/app/logs
+
+  gip-federation:
+    image: ghcr.io/tehkne-solutions/gip-federation:latest
+    container_name: gip-federation
+    ports:
+      - "8810:8810"
+    environment:
+      FEDERATION_PORT: 8810
+      NODE_ENV: production
+    restart: unless-stopped
+    networks:
+      - gip-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-gip
+    ports:
+      - "11434:11434"
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    restart: unless-stopped
+    networks:
+      - gip-network
+    volumes:
+      - ollama-data:/root/.ollama
+
+networks:
+  gip-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
+    driver: local
